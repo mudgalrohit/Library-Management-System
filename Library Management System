@@ -1,0 +1,136 @@
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class LibraryProblem {
+    private int numStudents = 0;
+    private int numTeachers = 0;
+    private int numStudentsWaiting = 0;
+    private int numTeachersWaiting = 0;
+    private boolean teacherIsBeingServed = false;
+    private Lock lock = new ReentrantLock();
+    private Condition studentQueue = lock.newCondition();
+    private Condition teacherQueue = lock.newCondition();
+
+    public void studentEnter() throws InterruptedException {
+        lock.lock();
+        try {
+            numStudents++;
+            System.out.println("Student entered. Number of students: " + numStudents);
+            if (teacherIsBeingServed) {
+                numStudentsWaiting++;
+                System.out.println("Student waiting. Number of students waiting: " + numStudentsWaiting);
+                studentQueue.await();
+                numStudentsWaiting--;
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void studentExit() {
+        lock.lock();
+        try {
+            numStudents--;
+            System.out.println("Student exited. Number of students: " + numStudents);
+            if (numTeachersWaiting > 0) {
+                teacherQueue.signal();
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void teacherEnter() throws InterruptedException {
+        lock.lock();
+        try {
+            numTeachers++;
+            System.out.println("Teacher entered. Number of teachers: " + numTeachers);
+            if (teacherIsBeingServed) {
+                numTeachersWaiting++;
+                System.out.println("Teacher waiting. Number of teachers waiting: " + numTeachersWaiting);
+                teacherQueue.await();
+                numTeachersWaiting--;
+            }
+            else if (numStudentsWaiting > 0) {
+                studentQueue.signal();
+            }
+            else {
+                teacherIsBeingServed = true;
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void teacherExit() {
+        lock.lock();
+        try {
+            numTeachers--;
+            System.out.println("Teacher exited. Number of teachers: " + numTeachers);
+            if (numTeachersWaiting > 0) {
+                teacherQueue.signal();
+            }
+            else if (numStudentsWaiting > 0) {
+                studentQueue.signal();
+            }
+            else {
+                teacherIsBeingServed = false;
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+    
+    public static void main(String[] args) {
+        LibraryProblem problem = new LibraryProblem();
+        
+        Thread studentThread1 = new Thread(() -> {
+            try {
+                problem.studentEnter();
+                System.out.println("Student 1 searching for books...");
+                Thread.sleep(1000);
+                problem.studentExit();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        studentThread1.start();
+        
+        Thread studentThread2 = new Thread(() -> {
+            try {
+                problem.studentEnter();
+                System.out.println("Student 2 searching for books...");
+                Thread.sleep(1000);
+                problem.studentExit();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        studentThread2.start();
+        
+        Thread teacherThread1 = new Thread(() -> {
+            try {
+                problem.teacherEnter();
+                System.out.println("Teacher 1 searching for books...");
+                Thread.sleep(1000);
+                problem.teacherExit();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        teacherThread1.start();
+        
+        Thread teacherThread2 = new Thread(() -> {
+            try {
+                problem.teacherEnter();
+                System.out.println("Teacher 2 searching for books...");
+                Thread.sleep(1000);
+                problem.teacherExit();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        teacherThread2.start();
+    }
+}
